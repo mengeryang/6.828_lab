@@ -70,13 +70,22 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 
 void handleEbp(unsigned int* ebp){
 
-	cprintf("ebp: %p  eip: %08x  args: ",ebp,*(ebp+1));
-	for(int i = 1;i < 6;i++){
+	int eip = *(ebp + 1);
+	struct Eipdebuginfo info;
+	int arg_num;
+	char buff[80];
+	debuginfo_eip((uintptr_t)eip, &info);
+	arg_num = info.eip_fn_narg;
+
+	cprintf("ebp %08x  eip %08x  args ",ebp,*(ebp+1));
+	for(int i = 2;i < 7;i++){
 		cprintf("%08x ",*(ebp + i));
 	}
 	cprintf("\n");
+	strncpy(buff,(const char*)info.eip_fn_name,info.eip_fn_namelen);
+	buff[info.eip_fn_namelen] ='\0';
+	cprintf("\t%s:%d: %s+%d\n",info.eip_file,info.eip_line,buff,eip - info.eip_fn_addr);
 }
-
 
 /***** Kernel monitor command interpreter *****/
 
