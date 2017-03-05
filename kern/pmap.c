@@ -308,7 +308,8 @@ page_init(void)
 		}
 		
 	}
-	memset(page2kva(page_free_list),0,1);
+	//memset(page2kva(page_free_list),0,1); this will cause triple
+	//fault
 	//cprintf("page_free_list:%x\n",page2kva(page_free_list));
 }
 
