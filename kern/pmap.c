@@ -284,6 +284,7 @@ page_init(void)
 	the mappings above UTOP are mostly set up at boot time by the kernel and should never be 	 freed, so there's no need to reference count them
 */
 		pages[i].pp_ref = 0;
+		//cprintf("pages[%d]:%08x\n",i,page2kva(&pages[i]));
 		if(i == 0){
 			pages[i].pp_link = NULL;
 		}
@@ -307,6 +308,8 @@ page_init(void)
 		}
 		
 	}
+	memset(page2kva(page_free_list),0,1);
+	//cprintf("page_free_list:%x\n",page2kva(page_free_list));
 }
 
 //
@@ -339,8 +342,31 @@ page_alloc(int alloc_flags)
 	result->pp_link = NULL;
 	if(alloc_flags & ALLOC_ZERO)
 		memset(page2kva(result),0,PGSIZE);
+	//cprintf("allocate page at:%08x\n",page2kva(result));
 	return result;
 }
+
+/*
+I Have a Question:
+	I found that after initializing the array of PageInfo,the
+	page_free_list points at pages[0x7fff] which corresponds to
+	kva:0xf7fff000 and pa:0x07fff000.But at the time, the pdt we
+	use is the one defined in entrypgdir.c and it only maps kva
+	[KERNBASE,KERNBASE + 4MB] at pa[0,4MB], which means pages after
+	pages[0x3ff] are all invalid at this moment.If we use page_alloc,
+	it should first allocate pages[0x7fff] and cause some problems.
+	However, in practice page_alloc first returns pages[0x3ff]
+	instead of pages[0x7fff], avoiding the potential problems. So
+	I wonder why this happens.
+
+Answers:
+	Find the answer in the function check_page_free_list(), this
+	function not only check your code but also redirect the pointer
+	page_free_list();
+	
+
+*/
+
 
 //
 // Return a page to the free list.
