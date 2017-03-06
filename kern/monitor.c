@@ -7,6 +7,7 @@
 #include <inc/assert.h>
 #include <inc/x86.h>
 
+#include <kern/pmap.h>
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
@@ -25,6 +26,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace","Display function call frames", mon_backtrace},
+	{ "showmapping","Display mappings between virtual address and physical address",mon_showmapping},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -68,25 +70,48 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-void handleEbp(unsigned int* ebp){
+int mon_showmapping(int argc, char **argv, struct Trapframe *tf){
+	uintptr_t start = ROUNDDOWN((uintptr_t)atoi(argv[1]),PGSIZE);
+	uintptr_t end = ROUNDDOWN((uintptr_t)atoi(argv[2]),PGSIZE);
+	pte_t *pte;
+	uint32_t pa;
+ 	const char *tbl[5] = {"NOT PRESENT","RW|RW","R-|R-","RW|--","R-|--"};
+	const char *perm;
 
-	int eip = *(ebp + 1);
-	struct Eipdebuginfo info;
-	int arg_num;
-	char buff[80];
-	debuginfo_eip((uintptr_t)eip, &info);
-	arg_num = info.eip_fn_narg;
-
-	cprintf("ebp %08x  eip %08x  args ",ebp,*(ebp+1));
-	for(int i = 2;i < 7;i++){
-		cprintf("%08x ",*(ebp + i));
+	if(end < start){
+		cprintf("invalid range\n");
+		return -1;
 	}
-	cprintf("\n");
-	strncpy(buff,(const char*)info.eip_fn_name,info.eip_fn_namelen);
-	buff[info.eip_fn_namelen] ='\0';
-	cprintf("\t%s:%d: %s+%d\n",info.eip_file,info.eip_line,buff,eip - info.eip_fn_addr);
-}
 
+	for(uintptr_t i = start;i <= end;i = i + PGSIZE)
+	{
+		pte = pgdir_walk(kern_pgdir,(void*)i,0);
+		if(pte == NULL)
+			continue;
+		pa = PTE_ADDR(*pte);
+		switch(*pte & 0x7){
+			case 1:
+				perm = tbl[4];
+				break;
+			case 3:
+				perm = tbl[3];
+				break;
+			case 5:
+				perm = tbl[2];
+				break;
+			case 7:	
+				perm = tbl[1];
+				break;
+			default:
+				perm = tbl[0];
+				break;
+		}
+		cprintf("%08x ----> %08x  %s\n",i,pa,perm);
+	}
+	
+	
+	return 0;
+}
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
@@ -147,3 +172,64 @@ monitor(struct Trapframe *tf)
 				break;
 	}
 }
+
+/**********customize tool function*********/
+void handleEbp(unsigned int* ebp){
+
+	int eip = *(ebp + 1);
+	struct Eipdebuginfo info;
+	int arg_num;
+	char buff[80];
+	debuginfo_eip((uintptr_t)eip, &info);
+	arg_num = info.eip_fn_narg;
+
+	cprintf("ebp %08x  eip %08x  args ",ebp,*(ebp+1));
+	for(int i = 2;i < 7;i++){
+		cprintf("%08x ",*(ebp + i));
+	}
+	cprintf("\n");
+	strncpy(buff,(const char*)info.eip_fn_name,info.eip_fn_namelen);
+	buff[info.eip_fn_namelen] ='\0';
+	cprintf("\t%s:%d: %s+%d\n",info.eip_file,info.eip_line,buff,eip - info.eip_fn_addr);
+}
+
+uint32_t atoi(char* num){
+	uint32_t result = 0;
+	uint32_t base = 10;
+	char char2num[128];
+	
+	memset(char2num,0x7f,128);
+	char2num['0'] = 0;
+	char2num['1'] = 1;
+	char2num['2'] = 2;
+	char2num['3'] = 3;
+	char2num['4'] = 4;
+	char2num['5'] = 5;
+	char2num['6'] = 6;
+	char2num['7'] = 7;
+	char2num['8'] = 8;
+	char2num['9'] = 9;
+	char2num['a'] = 10;
+	char2num['b'] = 11;
+	char2num['c'] = 12;
+	char2num['d'] = 13;
+	char2num['e'] = 14;
+	char2num['f'] = 15;
+	
+	
+	while(*num == '0')
+		num++;
+	//if((*num < '0' || *num > '9') && (*num != 'x'))
+		//return 0;
+	if(*num == 'x'){
+		base = 16;		
+		num++;
+	}
+	while(char2num[(int)*num] < base){
+		result = result*base + char2num[(int)*num];
+		num++;
+	}
+	return result;
+}
+
+
