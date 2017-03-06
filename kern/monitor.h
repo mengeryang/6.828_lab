@@ -15,5 +15,9 @@ void monitor(struct Trapframe *tf);
 int mon_help(int argc, char **argv, struct Trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
 int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
+int mon_showmapping(int argc, char **argv, struct Trapframe *tf);
 
+//Customized tool functions 
+void handleEbp(unsigned int* ebp);
+uint32_t atoi(char* num);
 #endif	// !JOS_KERN_MONITOR_H
