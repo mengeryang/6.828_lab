@@ -164,6 +164,8 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = (struct Env*)boot_alloc(NENV * sizeof(struct Env));
+	memset(envs,0,NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -199,6 +201,10 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	
+	boot_map_region(kern_pgdir,ROUNDDOWN(UENVS,PGSIZE),ROUNDUP(NENV*sizeof(struct Env),PGSIZE),ROUNDDOWN(PADDR(envs),PGSIZE),PTE_U|PTE_P);
+	/*since envs is above KERNBASE, envs itself will be mapped soon   (when mapping [KERNBASE, 2^32) at [0, 2^32 - KERNBASE))*/
+	//cprintf("envs:%08x\n",envs);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -408,6 +414,8 @@ page_free(struct PageInfo *pp)
 void
 page_decref(struct PageInfo* pp)
 {
+	if(pp->pp_ref == 0)
+		panic("page_decref: pp_ref is zero\n");
 	if (--pp->pp_ref == 0)
 		page_free(pp);
 }
