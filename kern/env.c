@@ -372,17 +372,18 @@ load_icode(struct Env *e, uint8_t *binary)
 		
 	}
 	
-	e->env_tf.tf_eip = elfhdr->e_entry;
+	
+	//cprintf("new env entry: %08x\n",elfhdr->e_entry);
 	
 	lcr3(PADDR(kern_pgdir));
-
+	e->env_tf.tf_eip = elfhdr->e_entry;
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
 	region_alloc(e,(void*)(USTACKTOP - PGSIZE),PGSIZE);
 	
-	//lcr3(PADDR(kern_pgdir));
+	
 }
 
 //
@@ -479,6 +480,8 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
+	//cprintf("*******env_pop_tf*******\n");
+	//print_trapframe(tf);
 	asm volatile(
 		"\tmovl %0,%%esp\n"
 		"\tpopal\n"

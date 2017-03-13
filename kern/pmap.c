@@ -139,7 +139,7 @@ mem_init(void)
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
 	memset(kern_pgdir, 0, PGSIZE);
-	
+	//cprintf("kern_pgdir:0x%08x\n",kern_pgdir);
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
 	// a virtual page table at virtual address UVPT.
@@ -415,8 +415,8 @@ void
 page_decref(struct PageInfo* pp)
 {
 	if(pp->pp_ref == 0)
-		panic("page_decref: pp_ref is zero\n");
-	if (--pp->pp_ref == 0)
+		return;
+	if (--(pp->pp_ref) == 0)
 		page_free(pp);
 }
 
@@ -637,7 +637,19 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	pte_t* pte;
 
+	for(uint32_t i = (uint32_t)ROUNDDOWN(va,PGSIZE);i < (uint32_t)ROUNDUP(va+len,PGSIZE);i = i+PGSIZE)
+	{
+		pte = pgdir_walk(env->env_pgdir,(void*)i,0);
+		if(pte == NULL || (*pte & 0x7) < perm){
+			if(i == (uint32_t)ROUNDDOWN(va,PGSIZE))
+				user_mem_check_addr = (uint32_t)va;
+			else
+				user_mem_check_addr = i;
+			return -E_FAULT;
+		}
+	}
 	return 0;
 }
 

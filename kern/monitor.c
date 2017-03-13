@@ -28,6 +28,8 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace","Display function call frames", mon_backtrace},
 	{ "showmapping","Display mappings between virtual address and physical address",mon_showmapping},
+	{ "si","Singe step",mon_si},
+	{ "c","Continue",mon_continue},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -71,7 +73,9 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int mon_showmapping(int argc, char **argv, struct Trapframe *tf){
+int 
+mon_showmapping(int argc, char **argv, struct Trapframe *tf)
+{
 	uintptr_t start = ROUNDDOWN((uintptr_t)atoi(argv[1]),PGSIZE);
 	uintptr_t end = ROUNDDOWN((uintptr_t)atoi(argv[2]),PGSIZE);
 	pte_t *pte;
@@ -112,6 +116,32 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf){
 	
 	
 	return 0;
+}
+
+int 
+mon_si(int argc, char **argv, struct Trapframe *tf)
+{
+	if(tf == NULL)
+	{
+		cprintf("no running process.\n");
+		return 0;
+	}
+	
+	tf->tf_eflags |= FL_TF;
+	return -1;
+}
+
+int
+mon_continue(int argc, char **argv, struct Trapframe *tf)
+{
+	if(tf == NULL)
+	{
+		cprintf("no running process.\n");
+		return 0;
+	}
+	
+	tf->tf_eflags &= ~FL_TF;
+	return -1;
 }
 /***** Kernel monitor command interpreter *****/
 
