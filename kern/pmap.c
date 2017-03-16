@@ -54,7 +54,7 @@ i386_detect_memory(void)
 	npages = totalmem / (PGSIZE / 1024);
 	npages_basemem = basemem / (PGSIZE / 1024);
 	//cprintf("npages:%d\n",npages);
-	//cprintf("base_npages:%d\n",npages_basemem);
+	cprintf("base_npages:%d\n",npages_basemem);
 	cprintf("Physical memory: %uK available, base = %uK, extended = %uK\n",
 		totalmem, basemem, totalmem - basemem);
 }
@@ -230,11 +230,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-
-<<<<<<< HEAD
-	// Initialize the SMP-related parts of the memory map
-	mem_init_mp();
-=======
+	
 	boot_map_region(kern_pgdir,ROUNDDOWN(KERNBASE,PGSIZE),ROUNDUP((1 << 31) - KERNBASE + (1 << 31),PGSIZE),0,PTE_W|PTE_P);
 
 
@@ -244,7 +240,9 @@ mem_init(void)
 		//cprintf("pgdir:%x",pd_pte[0x118]);
 
 
->>>>>>> lab3
+	// Initialize the SMP-related parts of the memory map
+	mem_init_mp();
+
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -293,6 +291,12 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	for(int i = 0;i < NCPU;i++)
+	{
+		boot_map_region(kern_pgdir,(uint32_t)ROUNDDOWN(KSTACKTOP-i*(KSTKSIZE+KSTKGAP)-KSTKSIZE,PGSIZE),ROUNDUP(KSTKSIZE,PGSIZE),(uint32_t)ROUNDDOWN(PADDR(percpu_kstacks[i]),PGSIZE),PTE_W);
+		//cprintf("percpu_kstack[i]:%08x\n",percpu_kstacks[i]);
+		//cprintf("percpu_kstack[i]-KSTKSIZE:%08x\n",percpu_kstacks[i]-KSTKSIZE);
+	}
 
 }
 
@@ -345,9 +349,10 @@ page_init(void)
 		}
 		else{
 			pa = (uint32_t)page2pa(&pages[i]);
-			//if(pa >= (uint32_t)ROUNDDOWN(IOPHYSMEM,PGSIZE) 
-			if(pa >= (uint32_t)(npages_basemem*PGSIZE)
-			&& pa < (uint32_t)ROUNDUP(EXTPHYSMEM,PGSIZE)){
+ 
+			if((pa >= MPENTRY_PADDR && pa < MPENTRY_PADDR+PGSIZE)
+			|| (pa >= (uint32_t)(npages_basemem*PGSIZE)
+			&& pa < (uint32_t)ROUNDUP(EXTPHYSMEM,PGSIZE))){
 				pages[i].pp_link = NULL;
 			}
 			else{
@@ -681,7 +686,13 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	int allocSize = ROUNDUP(size,PGSIZE);
+	uintptr_t res = base;
+	if(base + allocSize > MMIOLIM)
+		panic("mmio_map_region:va exceed MMIOLIM\n");
+	boot_map_region(kern_pgdir,base,allocSize,ROUNDDOWN(pa,PGSIZE),PTE_PCD|PTE_PWT|PTE_W);
+	base += allocSize;
+	return (void*)res;
 }
 
 static uintptr_t user_mem_check_addr;
@@ -923,9 +934,12 @@ check_kern_pgdir(void)
 	// (updated in lab 4 to check per-CPU kernel stacks)
 	for (n = 0; n < NCPU; n++) {
 		uint32_t base = KSTACKTOP - (KSTKSIZE + KSTKGAP) * (n + 1);
-		for (i = 0; i < KSTKSIZE; i += PGSIZE)
+		for (i = 0; i < KSTKSIZE; i += PGSIZE){
+			//left("cprintf:%08x\nright:%08x\n",check_va2pa(pgdir, base + KSTKGAP + i),PADDR(percpu_kstacks[n]) + i);
 			assert(check_va2pa(pgdir, base + KSTKGAP + i)
 				== PADDR(percpu_kstacks[n]) + i);
+			
+		}
 		for (i = 0; i < KSTKGAP; i += PGSIZE)
 			assert(check_va2pa(pgdir, base + i) == ~0);
 	}
